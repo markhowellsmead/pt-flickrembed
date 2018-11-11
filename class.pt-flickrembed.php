@@ -38,7 +38,7 @@ class PTFLICKREMBED
 
 		if (!empty($this->config['flickr_key']) && !empty($this->config['flickr_secret']) && !empty($this->config['flickr_userid'])) {
 			add_action('wp_enqueue_scripts', array(&$this,'add_scripts'));
-			add_shortcode('flickr', array(&$this, 'parse'));
+			add_shortcode('flickr', array(&$this, 'parse'), 10, 2);
 			//add_action('admin_menu', array(PTFLICKREMBED,'wpadmin'));
 	
 			$this->upload_dir = wp_upload_dir();
@@ -55,7 +55,7 @@ class PTFLICKREMBED
 	{
 		$this->debug = is_user_logged_in() || $_GET['pt-flickrembed-force']==1;
 
-		$atts=shortcode_atts(array(
+		$atts = shortcode_atts(array(
 			'id'				=> '',
 			'link'				=> '',
 			'size'				=> 'c',
@@ -364,23 +364,35 @@ class PTFLICKREMBED
 	public function view_single()
 	{
 		if ($this->atts['mode'] !== 'src') {
-			$this->backupLargestFlickrFile($this->atts['id']);
+			$image_pathpart = $this->backupLargestFlickrFile($this->atts['id']);
 
-			$html = '';
+			if ($image_pathpart) {
+				$file_info = getimagesize($this->backupfolder . $image_pathpart);
 
-			$transient_name = md5('flickr-view_single-' . $this->atts['id'] . '.cachify');
+				$html = sprintf(
+					'<div class="wp-caption alignnone pt-flickrembed flickr"><img src="%1$s" alt="%2$s" width="%3$s" height="%4$s"></div>',
+					$this->backupfolderURL . $image_pathpart,
+					'',
+					$file_info[0],
+					$file_info[1]
+				);
+			} else {
+				$html = '';
 
-			if (false === ($html = get_transient($transient_name))) {
-				$html = wp_oembed_get('https://www.flickr.com/photos/mhowells/'.$this->atts['id'].'/', array('width' => 640));
+				$transient_name = md5('flickr-view_single-' . $this->atts['id'] . '.cachify');
+
+				if (false === ($html = get_transient($transient_name))) {
+					$html = wp_oembed_get('https://www.flickr.com/photos/mhowells/'.$this->atts['id'].'/', array('width' => 640));
 		
-				if (!empty($html)) {
-					$html = sprintf(
-						$this->image_wrapper_tag,
-						$this->attr['size'],
-						$html
-					);
+					if (!empty($html)) {
+						$html = sprintf(
+							$this->image_wrapper_tag,
+							$this->attr['size'],
+							$html
+						);
 						
-					set_transient($transient_name, $html, WEEK_IN_SECONDS);
+						set_transient($transient_name, $html, WEEK_IN_SECONDS);
+					}
 				}
 			}
 			
@@ -592,7 +604,9 @@ class PTFLICKREMBED
 			$this->multisortInt($sizes['sizes']['size'], 'width', SORT_DESC);
 			$largestURL = $sizes['sizes']['size'][0]['source'];
 
-			if (!file_exists($this->backupfolder . parse_url($largestURL, PHP_URL_PATH))) {
+			if (file_exists($this->backupfolder . parse_url($largestURL, PHP_URL_PATH))) {
+				return parse_url($largestURL, PHP_URL_PATH);
+			} else {
 				$backupfile = parse_url($largestURL, PHP_URL_PATH);
 				$urlbits = explode('/', $backupfile);
 				if (!is_dir($this->backupfolder . '/' . $urlbits[1])) {
@@ -606,10 +620,10 @@ class PTFLICKREMBED
 					$success = @copy($largestURL, $destination);
 					if ($success) {
 						error_log(date('Y-m-d h:i:s') .chr(9). $destination .chr(9). 'File copied' . PHP_EOL, 3, __DIR__ . '/log/backupLargestFlickrFile.log');
-					//return $this->backupfolderURL . parse_url($largestURL, PHP_URL_PATH);
+						return parse_url($largestURL, PHP_URL_PATH);
 					} else {
 						error_log(date('Y-m-d h:i:s') .chr(9). $destination .chr(9). 'File not copied' . PHP_EOL, 3, __DIR__ . '/log/backupLargestFlickrFile.log');
-						//return null;
+						return null;
 					}
 				}
 			}
