@@ -592,7 +592,7 @@ class PTFLICKREMBED
 			$this->multisortInt($sizes['sizes']['size'], 'width', SORT_DESC);
 			$largestURL = $sizes['sizes']['size'][0]['source'];
 
-			if (true || !file_exists($this->backupfolder . parse_url($largestURL, PHP_URL_PATH))) {
+			if (!file_exists($this->backupfolder . parse_url($largestURL, PHP_URL_PATH))) {
 				$backupfile = parse_url($largestURL, PHP_URL_PATH);
 				$urlbits = explode('/', $backupfile);
 				if (!is_dir($this->backupfolder . '/' . $urlbits[1])) {
